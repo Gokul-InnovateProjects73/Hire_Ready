@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: hire_ready_mongo
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: hire_ready
+    networks:
+      - hire_ready_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: hire_ready_redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    networks:
+      - hire_ready_network
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: hire_ready_server
+    restart: unless-stopped
+    ports:
+      - '5000:5000'
+    environment:
+      PORT: 5000
+      MONGODB_URI: mongodb://mongodb:27017/hire_ready
+      JWT_SECRET: ${JWT_SECRET:-change_this_secret_in_production}
+      JWT_EXPIRE: 7d
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      NODE_ENV: ${NODE_ENV:-production}
+      REDIS_URL: redis://redis:6379
+      FRONTEND_URL: http://localhost:3000
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - hire_ready_network
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: hire_ready_client
+    restart: unless-stopped
+    ports:
+      - '3000:80'
+    depends_on:
+      - server
+    networks:
+      - hire_ready_network
+
+volumes:
+  mongo_data:
+  redis_data:
+
+networks:
+  hire_ready_network:
+    driver: bridge
